@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ChasingLight.Api/ChasingLight.Api.csproj" />
+  </Folder>
+</Solution>
