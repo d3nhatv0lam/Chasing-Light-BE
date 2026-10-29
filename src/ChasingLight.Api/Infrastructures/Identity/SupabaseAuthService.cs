@@ -117,6 +117,8 @@ public class SupabaseAuthService : IAuthService
         }
 
         var authData = JsonSerializer.Deserialize<SupabaseAuthResponse>(responseBody, JsonOptions);
+        var userId = authData?.User?.Id ?? authData?.RootId ?? Guid.Empty;
+        var email = authData?.User?.Email ?? authData?.RootEmail ?? string.Empty;
 
         // Trường hợp đăng ký khi Supabase BẬT tính năng Confirm Email:
         // Supabase trả về 200 OK với thông tin User, nhưng session chưa được cấp (access_token = null).
@@ -126,8 +128,8 @@ public class SupabaseAuthService : IAuthService
                 AccessToken: null,
                 RefreshToken: null,
                 ExpiresIn: 0,
-                UserId: authData?.User?.Id ?? Guid.Empty,
-                Email: authData?.User?.Email ?? string.Empty,
+                UserId: userId,
+                Email: email,
                 RequiresEmailConfirmation: true
             );
         }
@@ -145,8 +147,8 @@ public class SupabaseAuthService : IAuthService
             AccessToken: authData.AccessToken,
             RefreshToken: authData.RefreshToken ?? string.Empty,
             ExpiresIn: authData.ExpiresIn,
-            UserId: authData.User?.Id ?? Guid.Empty,
-            Email: authData.User?.Email ?? string.Empty,
+            UserId: userId,
+            Email: email,
             RequiresEmailConfirmation: false
         );
     }
@@ -171,7 +173,9 @@ public class SupabaseAuthService : IAuthService
         [property: JsonPropertyName("access_token")] string? AccessToken,
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("expires_in")] int ExpiresIn,
-        [property: JsonPropertyName("user")] SupabaseUserData? User
+        [property: JsonPropertyName("user")] SupabaseUserData? User,
+        [property: JsonPropertyName("id")] Guid? RootId,
+        [property: JsonPropertyName("email")] string? RootEmail
     );
 
     private record SupabaseUserData(
