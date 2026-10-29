@@ -1,5 +1,6 @@
 using ChasingLight.Api.DTOs.Common;
 using ChasingLight.Api.Infrastructures.Data;
+using ChasingLight.Api.Infrastructures.Identity;
 using ChasingLight.Api.Services;
 using ChasingLight.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -59,7 +60,6 @@ public static class ServiceCollectionExtensions
                     // Giới hạn thuật toán chữ ký được chấp nhận
                     // Chỉ chấp nhận thuật toán ký bất đối xứng chuẩn 
                     ValidAlgorithms = [SecurityAlgorithms.RsaSha256, SecurityAlgorithms.EcdsaSha256]
-                    
                 };
                 
                 options.Events = new JwtBearerEvents()
@@ -87,10 +87,15 @@ public static class ServiceCollectionExtensions
     }
     
     /// <summary>
-    /// Đăng ký các Business Services
+    /// Đăng ký các Business Services & Identity Infrastructure
     /// </summary>
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
+        // 1. Cấu hình Supabase Options & Typed HttpClient
+        services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
+        services.AddHttpClient<IAuthService, SupabaseAuthService>();
+
+        // 2. Business Services
         services.AddScoped<IRecordsService, RecordsService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();
         services.AddScoped<IProfilesService, ProfilesService>();
