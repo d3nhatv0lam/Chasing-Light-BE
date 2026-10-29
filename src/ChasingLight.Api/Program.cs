@@ -1,15 +1,18 @@
-using ChasingLight.Api.DTOs.Common;
 using ChasingLight.Api.Infrastructures.Extensions;
 using ChasingLight.Api.Infrastructures.Middlewares;
-using Microsoft.AspNetCore.Diagnostics;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddDataBaseConfiguration(builder.Configuration)
+    .AddSupabaseJwtAuthentication(builder.Configuration);
+
+builder.Services.AddApplicationServices();
 
 var app = builder.Build();
 
@@ -19,14 +22,15 @@ app.UseMiddleware<ExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.MapNotFoundFallback();
 
 app.Run();
