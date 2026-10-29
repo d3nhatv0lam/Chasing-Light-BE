@@ -13,7 +13,7 @@ public static class EndpointRouteBuilderExtensions
             var errorResponse = new ErrorResponse(
                 statusCode: StatusCodes.Status404NotFound,
                 errorCode: "ENDPOINT_NOT_FOUND",
-                message: $"Đường dẫn '{context.Request.Path}' không tồn tại trên hệ thống!"
+                message: $"The requested endpoint '{context.Request.Path}' was not found."
             );
 
             await context.Response.WriteAsJsonAsync(errorResponse);

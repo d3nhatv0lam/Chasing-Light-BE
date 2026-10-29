@@ -492,5 +492,5 @@ appsettings.*.Local.json
 .xerj-data/
 
 # Bỏ qua cấu hình môi trường dev chứa connection string / secret
-appsettings.Development.json
-src/ChasingLight.Api/appsettings.Development.json
+appsettings.*.json
+!appsettings.example.json

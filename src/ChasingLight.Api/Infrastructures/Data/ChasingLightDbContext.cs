@@ -21,20 +21,33 @@ public class ChasingLightDbContext : DbContext
         {
             builder.ToTable("profiles");
             builder.HasKey(p => p.Id);
-            builder.Property(p => p.DisplayName).HasMaxLength(150);
+            builder.Property(p => p.Id).HasColumnName("id");
+            builder.Property(p => p.DisplayName).HasColumnName("display_name").HasMaxLength(150);
+            builder.Property(p => p.AvatarUrl).HasColumnName("avatar_url");
+            builder.Property(p => p.TotalStars).HasColumnName("total_stars");
+            builder.Property(p => p.UpdatedAt).HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<Stage>(builder =>
         {
             builder.ToTable("stages");
             builder.HasKey(s => s.Id);
-            builder.Property(s => s.Difficulty).HasConversion<short>();
+            builder.Property(s => s.Id).HasColumnName("id");
+            builder.Property(s => s.StageNumber).HasColumnName("stage_number");
+            builder.Property(s => s.Difficulty).HasColumnName("difficulty").HasConversion<short>();
+            builder.Property(s => s.CreatedAt).HasColumnName("created_at");
         });
 
         modelBuilder.Entity<UserRecord>(builder =>
         {
             builder.ToTable("user_records");
             builder.HasKey(r => new { r.UserId, r.StageId });
+            builder.Property(r => r.UserId).HasColumnName("user_id");
+            builder.Property(r => r.StageId).HasColumnName("stage_id");
+            builder.Property(r => r.StarsEarned).HasColumnName("stars_earned");
+            builder.Property(r => r.BestTimeSeconds).HasColumnName("best_time_seconds");
+            builder.Property(r => r.BestStepCount).HasColumnName("best_step_count");
+            builder.Property(r => r.UpdatedAt).HasColumnName("updated_at");
 
             builder.HasOne(r => r.Profile)
                 .WithMany()
@@ -43,7 +56,7 @@ public class ChasingLightDbContext : DbContext
 
             builder.HasOne(r => r.Stage)
                 .WithMany()
-                .HasForeignKey(r => r.UserId)
+                .HasForeignKey(r => r.StageId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasIndex(r => new { r.StageId, r.StarsEarned, r.BestTimeSeconds, r.BestStepCount })
