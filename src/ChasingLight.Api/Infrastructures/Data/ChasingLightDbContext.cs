@@ -50,12 +50,12 @@ public class ChasingLightDbContext : DbContext
             builder.Property(r => r.UpdatedAt).HasColumnName("updated_at");
 
             builder.HasOne(r => r.Profile)
-                .WithMany()
+                .WithMany(p => p.UserRecords)
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(r => r.Stage)
-                .WithMany()
+                .WithMany(s => s.UserRecords)
                 .HasForeignKey(r => r.StageId)
                 .OnDelete(DeleteBehavior.Cascade);
 
