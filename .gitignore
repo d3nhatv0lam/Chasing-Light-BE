@@ -487,3 +487,10 @@ appsettings.*.Local.json
 .env
 .env.*
 !.env.example
+
+#xerj
+.xerj-data/
+
+# Bỏ qua cấu hình môi trường dev chứa connection string / secret
+appsettings.*.json
+!appsettings.example.json

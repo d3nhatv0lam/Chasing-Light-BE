@@ -10,7 +10,7 @@ public class NotFoundException : AppException
     }
 
     public NotFoundException(string resourceName, object key, string errorCode = _defaultErrorCode)
-        : base($"Không tìm thấy tài nguyên '{resourceName}' với định danh ({key})!", errorCode,
+        : base($"Resource '{resourceName}' with ID ({key}) was not found.", errorCode,
             StatusCodes.Status404NotFound)
     {
     }
