@@ -4,13 +4,14 @@ using ChasingLight.Api.DTOs.Profiles;
 using ChasingLight.Api.Exceptions;
 using ChasingLight.Api.Infrastructures.Extensions;
 using ChasingLight.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChasingLight.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/profiles")]
-// [Authorize] // comment to test API
+[Authorize]
 public class ProfilesController : ControllerBase
 {
     private readonly IProfilesService _profilesService;

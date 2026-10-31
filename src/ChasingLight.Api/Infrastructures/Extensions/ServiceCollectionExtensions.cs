@@ -4,6 +4,7 @@ using ChasingLight.Api.Infrastructures.Identity;
 using ChasingLight.Api.Services;
 using ChasingLight.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -11,6 +12,29 @@ namespace ChasingLight.Api.Infrastructures.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection ConfigureValidationErrorResponse(this IServiceCollection services)
+    {
+        services.Configure<ApiBehaviorOptions>(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var errors = context.ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .Where(msg => !string.IsNullOrEmpty(msg))
+                    .ToList();
+                
+                var errorResponse = new ErrorResponse(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: "VALIDATION_ERROR",
+                    message: string.Join("; ", errors)
+                );
+                return new BadRequestObjectResult(errorResponse);
+            };
+        });
+        return services; // Trả về đúng IServiceCollection
+    }
+    
     public static IServiceCollection AddDataBaseConfiguration(this IServiceCollection services,
         IConfiguration configuration)
     {
