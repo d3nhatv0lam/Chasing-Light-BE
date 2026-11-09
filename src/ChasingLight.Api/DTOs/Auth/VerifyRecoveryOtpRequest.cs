@@ -8,6 +8,6 @@ public record VerifyRecoveryOtpRequest(
     string Email,
 
     [Required(ErrorMessage = "Verification OTP is required.")]
-    [StringLength(6, MinimumLength = 6, ErrorMessage = "OTP must be exactly 6 digits.")]
+    [StringLength(8, MinimumLength = 8, ErrorMessage = "OTP must be exactly 8 digits.")]
     string Otp
 );
