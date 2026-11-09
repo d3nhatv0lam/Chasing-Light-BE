@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ChasingLight.Api.DTOs.Auth;
@@ -74,8 +74,146 @@ public class SupabaseAuthService : IAuthService
             id_token = request.IdToken.Trim(),
             nonce = request.Nonce
         };
-
+        
         return await SendAuthRequestAsync("auth/v1/token?grant_type=id_token", payload, isRegistration: false, cancellationToken);
+    }
+
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "auth/v1/recover");
+        requestMessage.Headers.Add("apikey", _options.PublishableKey);
+        requestMessage.Content = JsonContent.Create(new { email = request.Email.Trim() });
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during forgot-password.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var errorInfo = ParseSupabaseError(responseBody);
+            _logger.LogWarning("Supabase Auth rejected forgot-password ({StatusCode}): {Message}", response.StatusCode, errorInfo.Message);
+
+            if ((int)response.StatusCode == StatusCodes.Status429TooManyRequests)
+            {
+                throw new AppException(errorInfo.Message, "TOO_MANY_REQUESTS", StatusCodes.Status429TooManyRequests);
+            }
+
+            // Nuốt lỗi trả 200 cho client
+        }
+    }
+
+    public async Task<VerifyRecoveryOtpResponse> VerifyRecoveryOtpAsync(VerifyRecoveryOtpRequest request, CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            type = "recovery",
+            email = request.Email.Trim(),
+            token = request.Otp.Trim()
+        };
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "auth/v1/verify");
+        requestMessage.Headers.Add("apikey", _options.PublishableKey);
+        requestMessage.Content = JsonContent.Create(payload);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during verify-recovery-otp.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorInfo = ParseSupabaseError(responseBody);
+            _logger.LogWarning("Supabase Auth rejected OTP verification ({StatusCode}): {Message}", response.StatusCode, errorInfo.Message);
+
+            throw new AppException(
+                errorInfo.Message,
+                errorInfo.ErrorCode,
+                (int)response.StatusCode
+            );
+        }
+
+        var authData = JsonSerializer.Deserialize<SupabaseAuthResponse>(responseBody, JsonOptions);
+        if (string.IsNullOrEmpty(authData?.AccessToken))
+        {
+            throw new AppException(
+                "OTP verification failed: No recovery token issued.",
+                "OTP_VERIFICATION_FAILED",
+                StatusCodes.Status400BadRequest
+            );
+        }
+
+        return new VerifyRecoveryOtpResponse(
+            RecoveryToken: authData.AccessToken,
+            ExpiresIn: authData.ExpiresIn,
+            Email: request.Email.Trim()
+        );
+    }
+
+    public async Task<AuthResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Put, "auth/v1/user");
+        requestMessage.Headers.Add("apikey", _options.PublishableKey);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.RecoveryToken.Trim());
+        requestMessage.Content = JsonContent.Create(new { password = request.NewPassword });
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during reset-password.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorInfo = ParseSupabaseError(responseBody);
+            _logger.LogWarning("Supabase Auth rejected reset-password ({StatusCode}): {Message}", response.StatusCode, errorInfo.Message);
+
+            throw new AppException(
+                errorInfo.Message,
+                errorInfo.ErrorCode,
+                (int)response.StatusCode
+            );
+        }
+
+        var updatedUser = JsonSerializer.Deserialize<SupabaseUserData>(responseBody, JsonOptions);
+        if (string.IsNullOrWhiteSpace(updatedUser?.Email))
+        {
+            throw new AppException("Failed to determine account email after reset.", "RESET_PASSWORD_FAILED", StatusCodes.Status400BadRequest);
+        }
+
+        // Tự động đăng nhập với mật khẩu mới để cấp phiên mới tinh vào game
+        return await LoginAsync(new LoginRequest(updatedUser.Email, request.NewPassword), cancellationToken);
     }
 
     private async Task<AuthResponse> SendAuthRequestAsync(
@@ -120,7 +258,7 @@ public class SupabaseAuthService : IAuthService
         var userId = authData?.User?.Id ?? authData?.RootId ?? Guid.Empty;
         var email = authData?.User?.Email ?? authData?.RootEmail ?? string.Empty;
 
-        // Trường hợp đăng ký khi Supabase BẬT tính năng Confirm Email:
+        // Trường hợp đăng ký khi Supabase BẬT tính năng Confirm Email
         // Supabase trả về 200 OK với thông tin User, nhưng session chưa được cấp (access_token = null).
         if (isRegistration && string.IsNullOrEmpty(authData?.AccessToken))
         {
