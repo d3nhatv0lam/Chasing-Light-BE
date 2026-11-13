@@ -1,4 +1,3 @@
-
 using ChasingLight.Api.DTOs.Common;
 using ChasingLight.Api.DTOs.Profiles;
 using ChasingLight.Api.Exceptions;
@@ -49,5 +48,22 @@ public class ProfilesController : ControllerBase
         }
 
         return Ok(profile);
+    }
+
+    /// <summary>
+    /// Cập nhật thông tin profile của người chơi đang đăng nhập (DisplayName, AvatarUrl từ Supabase Storage).
+    /// </summary>
+    [HttpPatch("me")]
+    [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMyProfile(
+        [FromBody] UpdateProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var response = await _profilesService.UpdateProfileAsync(userId, request, cancellationToken);
+        return Ok(response);
     }
 }
