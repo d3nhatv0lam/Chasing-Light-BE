@@ -64,7 +64,7 @@ public class SupabaseStorageService : IStorageService
                 "STORAGE_UNAVAILABLE",
                 StatusCodes.Status503ServiceUnavailable);
         }
-
+        
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -78,6 +78,7 @@ public class SupabaseStorageService : IStorageService
         return $"{_options.Url.TrimEnd('/')}/storage/v1/object/public/{AvatarBucket}/{fileName}";
     }
 
+    // hiện không xóa những avt đã lưu lên storage nên chưa nhúng
     public async Task DeleteAvatarAsync(
         string fileName, 
         CancellationToken cancellationToken = default)
