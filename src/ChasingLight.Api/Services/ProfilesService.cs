@@ -1,8 +1,10 @@
+using System.IO;
 using ChasingLight.Api.DTOs.Profiles;
 using ChasingLight.Api.Exceptions;
 using ChasingLight.Api.Infrastructures.Data;
 using ChasingLight.Api.Mappers;
 using ChasingLight.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChasingLight.Api.Services;
@@ -10,15 +12,21 @@ namespace ChasingLight.Api.Services;
 public class ProfilesService : IProfilesService
 {
     private readonly ChasingLightDbContext _db;
+    private readonly IStorageService _storageService;
     private readonly ILogger<ProfilesService> _logger;
 
-    public ProfilesService(ChasingLightDbContext db, ILogger<ProfilesService> logger)
+    public ProfilesService(
+        ChasingLightDbContext db, 
+        IStorageService storageService,
+        ILogger<ProfilesService> logger)
     {
         _db = db;
+        _storageService = storageService;
         _logger = logger;
     }
 
-    public async Task<UserProfileResponse?> GetProfileByIdAsync(Guid userId,
+    public async Task<UserProfileResponse?> GetProfileByIdAsync(
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
         var profile = await _db.Profiles.AsNoTracking()
@@ -29,62 +37,60 @@ public class ProfilesService : IProfilesService
         return profile.ToResponse();
     }
 
-    public async Task<UserProfileResponse> UpdateProfileAsync(
-        Guid userId,
-        UpdateProfileRequest request,
+    public async Task<UserProfileResponse> UpdateDisplayNameAsync(
+        Guid userId, 
+        string displayName, 
         CancellationToken cancellationToken = default)
     {
-        var hasDisplayName = !string.IsNullOrWhiteSpace(request.DisplayName);
-        var hasAvatarUrl = !string.IsNullOrWhiteSpace(request.AvatarUrl);
-
-        if (!hasDisplayName && !hasAvatarUrl)
-        {
-            throw new AppException(
-                "At least DisplayName or AvatarUrl must be provided.",
-                "INVALID_PROFILE_UPDATE",
-                StatusCodes.Status400BadRequest);
-        }
-
         var profile = await _db.Profiles
-            .FirstOrDefaultAsync(p => p.Id == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("Profile", userId);
 
-        if (profile is null)
-        {
-            throw new NotFoundException("Profile", userId);
-        }
-
-        if (hasDisplayName)
-        {
-            var trimmedName = request.DisplayName!.Trim();
-            if (trimmedName.Length > 150)
-            {
-                throw new AppException(
-                    "DisplayName cannot exceed 150 characters.",
-                    "INVALID_DISPLAY_NAME",
-                    StatusCodes.Status400BadRequest);
-            }
-            profile.DisplayName = trimmedName;
-        }
-
-        if (hasAvatarUrl)
-        {
-            var trimmedUrl = request.AvatarUrl!.Trim();
-            if (trimmedUrl.Length > 1000)
-            {
-                throw new AppException(
-                    "AvatarUrl cannot exceed 1000 characters.",
-                    "INVALID_AVATAR_URL",
-                    StatusCodes.Status400BadRequest);
-            }
-            profile.AvatarUrl = trimmedUrl;
-        }
-
+        profile.DisplayName = displayName.Trim();
         profile.UpdatedAt = DateTimeOffset.UtcNow;
+
         await _db.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Profile updated for user {UserId}. DisplayName: {DisplayName}, AvatarUrl: {AvatarUrl}",
-            userId, profile.DisplayName, profile.AvatarUrl);
+        _logger.LogInformation("DisplayName updated for user {UserId} to {DisplayName}", userId, profile.DisplayName);
+        return profile.ToResponse();
+    }
 
+    public async Task<UserProfileResponse> UploadAvatarAsync(
+        Guid userId, 
+        IFormFile file, 
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.Profiles
+            .FirstOrDefaultAsync(p => p.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("Profile", userId);
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var fileName = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{ext}";
+        var publicUrl = await _storageService.UploadAvatarAsync(fileName, file, cancellationToken);
+
+        profile.AvatarUrl = publicUrl;
+        profile.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Avatar updated for user {UserId} to {AvatarUrl}", userId, profile.AvatarUrl);
+        return profile.ToResponse();
+    }
+
+    public async Task<UserProfileResponse> DeleteAvatarAsync(
+        Guid userId, 
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.Profiles
+            .FirstOrDefaultAsync(p => p.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("Profile", userId);
+
+        profile.AvatarUrl = null;
+        profile.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Avatar removed for user {UserId}", userId);
         return profile.ToResponse();
     }
 }
