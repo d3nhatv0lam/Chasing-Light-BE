@@ -1,6 +1,7 @@
 using ChasingLight.Api.DTOs.Common;
 using ChasingLight.Api.Infrastructures.Data;
 using ChasingLight.Api.Infrastructures.Identity;
+using ChasingLight.Api.Infrastructures.Storage;
 using ChasingLight.Api.Services;
 using ChasingLight.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -118,6 +119,7 @@ public static class ServiceCollectionExtensions
         // 1. Cấu hình Supabase Options & Typed HttpClient
         services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
         services.AddHttpClient<IAuthService, SupabaseAuthService>();
+        services.AddHttpClient<IStorageService, SupabaseStorageService>();
 
         // 2. Business Services
         services.AddScoped<IRecordsService, RecordsService>();

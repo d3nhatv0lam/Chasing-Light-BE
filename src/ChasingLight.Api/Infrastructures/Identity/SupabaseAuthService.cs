@@ -1,9 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ChasingLight.Api.DTOs.Auth;
 using ChasingLight.Api.Exceptions;
+using ChasingLight.Api.Infrastructures.Data;
 using ChasingLight.Api.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace ChasingLight.Api.Infrastructures.Identity;
@@ -12,6 +15,7 @@ public class SupabaseAuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
     private readonly SupabaseOptions _options;
+    private readonly ChasingLightDbContext _db;
     private readonly ILogger<SupabaseAuthService> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -22,10 +26,12 @@ public class SupabaseAuthService : IAuthService
     public SupabaseAuthService(
         HttpClient httpClient,
         IOptions<SupabaseOptions> options,
+        ChasingLightDbContext db,
         ILogger<SupabaseAuthService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _db = db;
         _logger = logger;
 
         if (string.IsNullOrWhiteSpace(_options.Url))
@@ -75,7 +81,56 @@ public class SupabaseAuthService : IAuthService
             nonce = request.Nonce
         };
         
-        return await SendAuthRequestAsync("auth/v1/token?grant_type=id_token", payload, isRegistration: false, cancellationToken);
+        var authResponse = await SendAuthRequestAsync("auth/v1/token?grant_type=id_token", payload, isRegistration: false, cancellationToken);
+
+        if (authResponse.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(request.IdToken))
+        {
+            await SyncGoogleProfileIfEmptyAsync(authResponse.UserId, request.IdToken, cancellationToken);
+        }
+
+        return authResponse;
+    }
+
+    private async Task SyncGoogleProfileIfEmptyAsync(Guid userId, string idToken, CancellationToken ct)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(idToken)) return;
+
+            var jwt = handler.ReadJwtToken(idToken);
+            var googlePic = jwt.Claims.FirstOrDefault(c => c.Type == "picture")?.Value;
+            var googleName = jwt.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var profile = await _db.Profiles.FirstOrDefaultAsync(p => p.Id == userId, ct);
+            if (profile is null) return;
+
+            bool updated = false;
+
+            // Fill-if-null: Chi dien neu profile chua tung co avatar hoac ten (khong ghi de anh tu upload)
+            if (string.IsNullOrEmpty(profile.AvatarUrl) && !string.IsNullOrEmpty(googlePic))
+            {
+                profile.AvatarUrl = googlePic;
+                updated = true;
+            }
+
+            if (string.IsNullOrEmpty(profile.DisplayName) && !string.IsNullOrEmpty(googleName))
+            {
+                profile.DisplayName = googleName;
+                updated = true;
+            }
+
+            if (updated)
+            {
+                profile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _db.SaveChangesAsync(ct);
+                _logger.LogInformation("Synced Google profile metadata for user {UserId}", userId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to sync Google OAuth profile metadata for user {UserId}", userId);
+        }
     }
 
     public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
