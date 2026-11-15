@@ -26,6 +26,9 @@ public class ChasingLightDbContext : DbContext
             builder.Property(p => p.AvatarUrl).HasColumnName("avatar_url");
             builder.Property(p => p.TotalStars).HasColumnName("total_stars");
             builder.Property(p => p.UpdatedAt).HasColumnName("updated_at");
+
+            builder.HasIndex(p => new { p.TotalStars, p.UpdatedAt })
+                .HasDatabaseName("idx_profiles_global_rank");
         });
 
         modelBuilder.Entity<Stage>(builder =>

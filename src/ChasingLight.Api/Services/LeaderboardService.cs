@@ -8,6 +8,9 @@ namespace ChasingLight.Api.Services;
 
 public class LeaderboardService : ILeaderboardService
 {
+    private const int DefaultLimit = 50;
+    private const int MaxLimit = 100;
+
     private readonly ChasingLightDbContext _db;
     private readonly ILogger<LeaderboardService> _logger;
 
@@ -18,16 +21,14 @@ public class LeaderboardService : ILeaderboardService
     }
 
     public async Task<IReadOnlyList<GlobalLeaderboardDto>> GetGlobalLeaderboardAsync(
-        int limit = 50, 
+        int limit = DefaultLimit, 
         CancellationToken cancellationToken = default)
     {
-        if (limit <= 0)
-        {
-            limit = 50;
-        }
+        limit = limit <= 0 ? DefaultLimit : Math.Min(limit, MaxLimit);
 
         var profiles = await _db.Profiles
             .AsNoTracking()
+            .Where(p => p.TotalStars > 0)
             .OrderByDescending(p => p.TotalStars)
             .ThenBy(p => p.UpdatedAt)
             .Take(limit)
@@ -55,7 +56,7 @@ public class LeaderboardService : ILeaderboardService
 
     public async Task<IReadOnlyList<StageLeaderboardDto>> GetStageLeaderboardAsync(
         Guid stageId, 
-        int limit = 50, 
+        int limit = DefaultLimit, 
         CancellationToken cancellationToken = default)
     {
         var stageExists = await _db.Stages
@@ -66,10 +67,7 @@ public class LeaderboardService : ILeaderboardService
             throw new NotFoundException("Stage", stageId);
         }
 
-        if (limit <= 0)
-        {
-            limit = 50;
-        }
+        limit = limit <= 0 ? DefaultLimit : Math.Min(limit, MaxLimit);
 
         var records = await _db.UserRecords
             .AsNoTracking()

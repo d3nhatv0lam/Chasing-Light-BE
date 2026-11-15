@@ -21,7 +21,7 @@ public class LeaderboardController : ControllerBase
     /// <summary>
     /// Lấy bảng xếp hạng toàn cầu theo tổng số sao đạt được.
     /// </summary>
-    /// <param name="limit">Số lượng người chơi hiển thị tối đa (mặc định 50).</param>
+    /// <param name="limit">Số lượng người chơi hiển thị tối đa (mặc định 50, tối đa 100).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     [HttpGet("global")]
     [ProducesResponseType(typeof(IReadOnlyList<GlobalLeaderboardDto>), StatusCodes.Status200OK)]
@@ -37,7 +37,7 @@ public class LeaderboardController : ControllerBase
     /// Lấy bảng xếp hạng của một màn chơi cụ thể theo số sao, thời gian và số bước đi.
     /// </summary>
     /// <param name="stageId">ID của màn chơi.</param>
-    /// <param name="limit">Số lượng người chơi hiển thị tối đa (mặc định 50).</param>
+    /// <param name="limit">Số lượng người chơi hiển thị tối đa (mặc định 50, tối đa 100).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     [HttpGet("stage/{stageId:guid}")]
     [ProducesResponseType(typeof(IReadOnlyList<StageLeaderboardDto>), StatusCodes.Status200OK)]
