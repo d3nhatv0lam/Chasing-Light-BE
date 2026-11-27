@@ -91,6 +91,16 @@ public class SupabaseAuthService : IAuthService
         return authResponse;
     }
 
+    public async Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request, CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            refresh_token = request.RefreshToken.Trim()
+        };
+
+        return await SendAuthRequestAsync("auth/v1/token?grant_type=refresh_token", payload, isRegistration: false, cancellationToken);
+    }
+
     private async Task SyncGoogleProfileIfEmptyAsync(Guid userId, string idToken, CancellationToken ct)
     {
         try
