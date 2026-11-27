@@ -48,6 +48,19 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Làm mới Access Token bằng Refresh Token hợp lệ.
+    /// </summary>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _authService.RefreshTokenAsync(request, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Yêu cầu gửi mã OTP 6 số về hòm thư để đặt lại mật khẩu.
     /// </summary>
     [HttpPost("forgot-password")]
