@@ -34,3 +34,5 @@ app.MapControllers();
 app.MapNotFoundFallback();
 
 app.Run();
+
+public partial class Program { }
