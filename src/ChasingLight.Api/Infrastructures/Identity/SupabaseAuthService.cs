@@ -281,6 +281,111 @@ public class SupabaseAuthService : IAuthService
         return await LoginAsync(new LoginRequest(updatedUser.Email, request.NewPassword), cancellationToken);
     }
 
+    public async Task<AuthResponse> ChangePasswordAsync(string userEmail, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        // 1. Xác minh mật khẩu cũ bằng cách thử đăng nhập
+        using var verifyMessage = new HttpRequestMessage(HttpMethod.Post, "auth/v1/token?grant_type=password");
+        verifyMessage.Headers.Add("apikey", _options.PublishableKey);
+        verifyMessage.Content = JsonContent.Create(new { email = userEmail, password = request.CurrentPassword });
+
+        HttpResponseMessage verifyResponse;
+        try
+        {
+            verifyResponse = await _httpClient.SendAsync(verifyMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during change-password.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (!verifyResponse.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Supabase Auth rejected change-password verify ({StatusCode}) for {Email}", verifyResponse.StatusCode, userEmail);
+            throw new AppException("Current password is incorrect.", "INVALID_CURRENT_PASSWORD", StatusCodes.Status400BadRequest);
+        }
+
+        var verifyBody = await verifyResponse.Content.ReadAsStringAsync(cancellationToken);
+        var verifyData = JsonSerializer.Deserialize<SupabaseAuthResponse>(verifyBody, JsonOptions);
+        if (string.IsNullOrEmpty(verifyData?.AccessToken))
+        {
+            throw new AppException("Failed to verify current password.", "INVALID_CURRENT_PASSWORD", StatusCodes.Status400BadRequest);
+        }
+
+        // 2. Cập nhật mật khẩu mới bằng token vừa lấy
+        using var updateMessage = new HttpRequestMessage(HttpMethod.Put, "auth/v1/user");
+        updateMessage.Headers.Add("apikey", _options.PublishableKey);
+        updateMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", verifyData.AccessToken);
+        updateMessage.Content = JsonContent.Create(new { password = request.NewPassword });
+
+        HttpResponseMessage updateResponse;
+        try
+        {
+            updateResponse = await _httpClient.SendAsync(updateMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during change-password update.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var updateBody = await updateResponse.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!updateResponse.IsSuccessStatusCode)
+        {
+            var errorInfo = ParseSupabaseError(updateBody);
+            _logger.LogWarning("Supabase Auth rejected change-password update ({StatusCode}): {Message}", updateResponse.StatusCode, errorInfo.Message);
+            throw new AppException(errorInfo.Message, errorInfo.ErrorCode, (int)updateResponse.StatusCode);
+        }
+
+        // 3. Đăng nhập lại với mật khẩu mới để cấp phiên mới cho client
+        return await LoginAsync(new LoginRequest(userEmail, request.NewPassword), cancellationToken);
+    }
+
+    public async Task<AuthResponse> SetPasswordAsync(string userAccessToken, string userEmail, SetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        // PUT auth/v1/user với Bearer = access token hiện tại
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Put, "auth/v1/user");
+        requestMessage.Headers.Add("apikey", _options.PublishableKey);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userAccessToken.Trim());
+        requestMessage.Content = JsonContent.Create(new { password = request.NewPassword });
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to connect to Supabase Auth service during set-password.");
+            throw new AppException(
+                "Unable to reach authentication service. Please try again later.",
+                "AUTH_SERVICE_UNAVAILABLE",
+                StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorInfo = ParseSupabaseError(responseBody);
+            _logger.LogWarning("Supabase Auth rejected set-password ({StatusCode}): {Message}", response.StatusCode, errorInfo.Message);
+            throw new AppException(errorInfo.Message, errorInfo.ErrorCode, (int)response.StatusCode);
+        }
+
+        var updatedUser = JsonSerializer.Deserialize<SupabaseUserData>(responseBody, JsonOptions);
+        var email = updatedUser?.Email ?? userEmail;
+
+        // Đăng nhập lại bằng email+password mới để cấp phiên mới cho client
+        return await LoginAsync(new LoginRequest(email, request.NewPassword), cancellationToken);
+    }
+
     private async Task<AuthResponse> SendAuthRequestAsync(
         string endpoint, 
         object payload, 

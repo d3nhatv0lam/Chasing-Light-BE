@@ -11,4 +11,6 @@ public interface IAuthService
     Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     Task<VerifyRecoveryOtpResponse> VerifyRecoveryOtpAsync(VerifyRecoveryOtpRequest request, CancellationToken cancellationToken = default);
     Task<AuthResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
+    Task<AuthResponse> ChangePasswordAsync(string userEmail, ChangePasswordRequest request, CancellationToken cancellationToken = default);
+    Task<AuthResponse> SetPasswordAsync(string userAccessToken, string userEmail, SetPasswordRequest request, CancellationToken cancellationToken = default);
 }
