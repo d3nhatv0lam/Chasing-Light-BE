@@ -1,0 +1,29 @@
+# Loại trừ output biên dịch local và test artifacts để giữ build context gọn nhẹ
+artifacts/
+**/bin/
+**/obj/
+TestResults/
+
+# Loại trừ dữ liệu Git, IDE, bộ test và công cụ nội bộ khỏi Docker image runtime
+.git/
+.github/
+.idea/
+.vs/
+.codegraph/
+.xerj-data/
+.archify/
+.claude/
+.agents/
+.rtk/
+tests/
+*.user
+*.suo
+*.log
+
+# Bảo mật: chặn tuyệt đối các file appsettings chứa secret/connection string local
+# Chỉ giữ lại appsettings.json (cấu hình chung) và appsettings.example.json
+**/appsettings.*.json
+!**/appsettings.json
+!**/appsettings.example.json
+.env
+.env.*

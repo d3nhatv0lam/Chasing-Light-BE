@@ -25,10 +25,25 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+// Chỉ chuyển hướng HTTPS khi chạy trực tiếp ngoài container;
+// trong Docker/Cloud PaaS, TLS thường do reverse proxy phía trước đảm nhận.
+var isRunningInContainer = string.Equals(
+    Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+
+if (!isRunningInContainer)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Endpoint kiểm tra sức khỏe cho Docker HEALTHCHECK và Cloud PaaS;
+// bắt buộc đặt trước MapNotFoundFallback() để không bị bắt nhầm thành 404.
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .AllowAnonymous();
 
 app.MapControllers();
 app.MapNotFoundFallback();
