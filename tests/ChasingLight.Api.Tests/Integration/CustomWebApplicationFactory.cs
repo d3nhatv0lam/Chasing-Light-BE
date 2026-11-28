@@ -133,4 +133,10 @@ public sealed class FakeAuthService : IAuthService
 
     public Task<AuthResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new AuthResponse("acc", "ref", 3600, Guid.NewGuid(), "user@example.com"));
+
+    public Task<AuthResponse> ChangePasswordAsync(string userEmail, ChangePasswordRequest request, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AuthResponse("acc", "ref", 3600, Guid.NewGuid(), userEmail));
+
+    public Task<AuthResponse> SetPasswordAsync(string userAccessToken, string userEmail, SetPasswordRequest request, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AuthResponse("acc", "ref", 3600, Guid.NewGuid(), userEmail));
 }
