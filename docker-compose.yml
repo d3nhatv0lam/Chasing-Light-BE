@@ -1,0 +1,14 @@
+services:
+  api:
+    build: .
+    ports:
+      - "5013:8080" 
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Truyền connection string và secrets qua file .env hoặc khai báo trực tiếp:
+      # - ConnectionStrings__DefaultConnection=...
+      # - Jwt__Secret=...
+    
+    # Dùng khi muốn nhúng env
+    # env_file:
+    #   - .env

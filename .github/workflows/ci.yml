@@ -42,7 +42,7 @@ jobs:
           --logger "trx;LogFileName=test-results.trx"
           --collect:"XPlat Code Coverage"
 
-      # Lưu kết quả test và coverage làm artifact để dễ tra cứu / đính kèm minh chứng báo cáo
+      # Lưu kết quả test và coverage làm artifact để dễ tra cứu
       - name: Upload test results & coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -59,6 +59,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Kiểm tra Dockerfile build thành công từ source sạch (không push lên registry)
+      # Kiểm tra Dockerfile build thành công từ source sạch
       - name: Build Docker image
         run: docker build -t chasinglight-api:ci .

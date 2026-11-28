@@ -1,5 +1,5 @@
 # ==============================================================================
-# Stage 1: Build & Publish ứng dụng .NET 10
+# Build & Publish ứng dụng .NET 10
 # ==============================================================================
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -15,10 +15,11 @@ RUN dotnet publish src/ChasingLight.Api/ChasingLight.Api.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:UseArtifactsOutput=false
 
 # ==============================================================================
-# Stage 2: Runtime image tối giản
+# Runtime image tối giản
 # ==============================================================================
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
@@ -33,17 +34,15 @@ USER app
 
 COPY --from=build /app/publish .
 
-# Xóa ASPNETCORE_HTTP_PORTS mặc định của base image để ưu tiên cấu hình động qua PORT (Render/Railway)
-# hoặc biến ASPNETCORE_HTTP_PORTS do người dùng truyền vào lúc chạy container; mặc định 8080
-ENV PORT=8080 \
-    ASPNETCORE_HTTP_PORTS="" \
+# Cổng container lắng nghe; override bằng ASPNETCORE_HTTP_PORTS lúc chạy (Render/Railway)
+ENV ASPNETCORE_HTTP_PORTS=8080 \
     ASPNETCORE_ENVIRONMENT=Production
 
 EXPOSE 8080
 
-# Kiểm tra sức khỏe dựa theo cổng thực tế container đang lắng nghe
+# Kiểm tra sức khỏe
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD sh -c 'TARGET_PORT=${ASPNETCORE_HTTP_PORTS:-${PORT:-8080}}; curl -fsS "http://localhost:${TARGET_PORT%%;*}/health" || exit 1'
+    CMD curl -fsS "http://localhost:8080/health" || exit 1
 
-# Dùng exec để tiến trình dotnet nhận trực tiếp tín hiệu SIGTERM khi dừng container
-ENTRYPOINT ["sh", "-c", "export ASPNETCORE_HTTP_PORTS=${ASPNETCORE_HTTP_PORTS:-${PORT:-8080}}; exec dotnet ChasingLight.Api.dll"]
+
+ENTRYPOINT ["dotnet", "ChasingLight.Api.dll"]
