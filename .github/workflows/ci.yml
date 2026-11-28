@@ -1,0 +1,64 @@
+# CI Workflow cho ChasingLight.Api: tự động build, chạy test và kiểm tra Docker image khi push/PR
+name: ChasingLight BE CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Cho phép kích hoạt chạy tay từ tab Actions trên GitHub khi cần demo
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Unit/Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Restore và build qua project test vì nó tham chiếu trực tiếp ChasingLight.Api,
+      # đảm bảo tương thích với cấu hình UseArtifactsOutput trong Directory.Build.props
+      - name: Restore dependencies
+        run: dotnet restore tests/ChasingLight.Api.Tests/ChasingLight.Api.Tests.csproj
+
+      - name: Build solution (Release)
+        run: dotnet build tests/ChasingLight.Api.Tests/ChasingLight.Api.Tests.csproj --configuration Release --no-restore
+
+      # Chạy toàn bộ xUnit tests kèm xuất log .trx và báo cáo coverage dạng Cobertura
+      - name: Run dotnet test
+        run: >
+          dotnet test tests/ChasingLight.Api.Tests/ChasingLight.Api.Tests.csproj
+          --configuration Release
+          --no-build
+          --verbosity normal
+          --results-directory TestResults
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+
+      # Lưu kết quả test và coverage làm artifact để dễ tra cứu / đính kèm minh chứng báo cáo
+      - name: Upload test results & coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-and-coverage
+          path: TestResults/**
+
+  docker-build-check:
+    name: Verify Dockerfile Build
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Kiểm tra Dockerfile build thành công từ source sạch (không push lên registry)
+      - name: Build Docker image
+        run: docker build -t chasinglight-api:ci .
